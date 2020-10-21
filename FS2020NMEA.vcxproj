@@ -157,6 +157,9 @@
     <None Include="LICENSE.md" />
     <None Include="Readme.md" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="FS2020NMEA.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

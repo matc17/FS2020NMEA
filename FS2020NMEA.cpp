@@ -1,87 +1,24 @@
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <iphlpapi.h>
-#pragma comment(lib, "IPHLPAPI.lib")
-#include <windows.h>
-#include <stdlib.h>
-#include <tchar.h>
-#include <stdio.h>
-#include <strsafe.h>
-#include <math.h>
-#include <SimConnect.h>
+#include "FS2020NMEA.h"
+
+
 //
 
 int     quit = 0;
 HANDLE  hSimConnect = NULL;
 
-#define DEFAULT_BUFLEN 4096
-#define DEFAULT_PORT "10110"
+
 
 bool bStopSending = false;
 
-class CMyCriticalSection
 
-{
-public:
-
-    CMyCriticalSection() { InitializeCriticalSection(&m_CriticalSection); }
-
-    ~CMyCriticalSection() { DeleteCriticalSection(&m_CriticalSection); }
-
-    void Enter() { EnterCriticalSection(&m_CriticalSection); }
-
-    void Leave() { LeaveCriticalSection(&m_CriticalSection); }
-
-private:
-
-    CRITICAL_SECTION m_CriticalSection;
-
-};
 
 // the most stupid class in the world. 2DO: replace with proper string class
-class MyString
-{
-public:
-    CMyCriticalSection m_Section;
-    int m_size;
-    static const int DefaultSize = DEFAULT_BUFLEN;
-    char* m_p;
-    MyString(int buff = DefaultSize) {
-        if (NULL != buff)
-        {
-            m_p = new char[buff];
-            m_size = buff;
-        }
-        else
-        {
-            m_p = NULL;
-            m_size = 0;
-        }
-          
-}
-    ~MyString()
-    {
-        if (NULL != m_p)
-        {
-            delete m_p;
-        }
-    }
 
-};
 MyString GPRMC;
 MyString GPGGA;
 MyString GPGSA;
 
-struct Struct1
-{
-    char    title[256];
-    double  kohlsmann;
-    double  altitude;
-    double  latitude;
-    double  longitude;
-    double  heading;
-    double speed;
-};
+
 
 bool getCheckSum(MyString& string)
 {
@@ -124,14 +61,19 @@ double toNMEACoordinate(double number)
     return RetVal;
 }
 
+
+
+
 bool returnGPRMCSentence(MyString& string, Struct1& Raw)
 {
     SYSTEMTIME Time;
     GetSystemTime(&Time);
 
     string.m_Section.Enter();
-    snprintf(string.m_p, string.m_size, "$GPRMC,%02d%02d%02d.00,A,%4.5f,%c,%4.5f,%c,%2.1f,%2.1f,%d%d%d,0.0,E,A*",
+    snprintf(string.m_p, string.m_size, "$GPRMC,%02d%02d%02d.00,A,%010.5f,%c,%010.5f,%c,%2.1f,%2.1f,%d%d%d,0.0,E,A*",
         Time.wHour, Time.wMinute, Time.wSecond, toNMEACoordinate(Raw.latitude), ((Raw.latitude > 0.0) ? 'N' : 'S'), toNMEACoordinate(Raw.longitude), ((Raw.longitude > 0.0) ? 'E' : 'W'), Raw.speed, Raw.heading, Time.wDay, Time.wMonth, Time.wYear);
+
+ 
 
     bool bRet = getCheckSum(string);
     string.m_Section.Leave();
@@ -145,7 +87,7 @@ bool  returnGPGGASentence(MyString & string, Struct1 & Raw)
     GetSystemTime(&Time);
     string.m_Section.Enter();
 
-    snprintf(string.m_p, string.m_size, "$GPGGA,%02d%02d%02d.00,%4.5f,%c,%4.5f,%c,1,8,0.0,%.1f,M,0.0,M,,,*",
+    snprintf(string.m_p, string.m_size, "$GPGGA,%02d%02d%02d.00,%010.5f,%c,%010.5f,%c,1,8,0.0,%.1f,M,0.0,M,,,*",
         Time.wHour, Time.wMinute, Time.wSecond, toNMEACoordinate(Raw.latitude), ((Raw.latitude > 0.0) ? 'N' : 'S'), toNMEACoordinate(Raw.longitude), ((Raw.longitude > 0.0) ? 'E' : 'W') , Raw.altitude/ 3.2808 );
     bool bRet = getCheckSum(string);
     string.m_Section.Leave();
@@ -161,6 +103,31 @@ bool returnGPGSASentence(MyString& string, Struct1& Raw)
 
     return true;
 }
+
+bool bSendDummySentences = true;
+DWORD SendDummySentence(
+    _In_ LPVOID lpParameter
+)
+{
+    Struct1 s;
+    s.altitude = 1883;
+    s.heading = s.trueheading = 260;
+    s.kohlsmann = 29.93;
+    s.latitude = 49.35220;
+    s.longitude = 11.48936;
+    s.speed = 0;
+
+    while (bSendDummySentences)
+    {
+        returnGPRMCSentence(GPRMC, s);
+        returnGPGSASentence(GPGSA, s);
+        returnGPGGASentence(GPGGA, s);
+        Sleep(1000);
+    }
+
+    return 0;
+}
+
 
 static enum EVENT_ID {
     EVENT_SIM_START,
@@ -211,13 +178,15 @@ void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void* pCont
             Struct1* pS = (Struct1*)&pObjData->dwData;
             if (SUCCEEDED(StringCbLengthA(&pS->title[0], sizeof(pS->title), NULL))) // security check
             {
+                
+                bSendDummySentences = false;
                 if (returnGPRMCSentence(GPRMC,*pS))
                 {
-                    //printf("%s\r\n", GPRMC.m_p);
+                 //   printf("%s\r\n", GPRMC.m_p);
                 }
                 if (returnGPGGASentence(GPGGA, *pS))
                 {
-                    //printf("%s\r\n", GPGGA.m_p);
+                //    printf("%s\r\n", GPGGA.m_p);
                 }
                 //printf("\nObjectID=%d  Title=\"%s\"\nLat=%f  Lon=%f  Alt=%f  Kohlsman=%.2f Heading=%f Speed=%f\r\n", ObjectID, pS->title, pS->latitude, pS->longitude, pS->altitude, pS->kohlsmann,pS->heading,pS->speed);
             }
@@ -285,7 +254,7 @@ void testDataRequest()
         hr = SimConnect_AddToDataDefinition(hSimConnect, DEFINITION_1, "Plane Altitude", "feet");
         hr = SimConnect_AddToDataDefinition(hSimConnect, DEFINITION_1, "Plane Latitude", "degrees");
         hr = SimConnect_AddToDataDefinition(hSimConnect, DEFINITION_1, "Plane Longitude", "degrees");
-        //hr = SimConnect_AddToDataDefinition(hSimConnect, DEFINITION_1, "Plane Heading Degrees True", "degrees");
+        hr = SimConnect_AddToDataDefinition(hSimConnect, DEFINITION_1, "Plane Heading Degrees True", "degrees");
         // GPS GROUND SPEED & Heading
         hr = SimConnect_AddToDataDefinition(hSimConnect, DEFINITION_1, "GPS GROUND TRUE HEADING", "degrees");
         hr = SimConnect_AddToDataDefinition(hSimConnect, DEFINITION_1, "Gps Ground Speed", "knots");
@@ -293,7 +262,7 @@ void testDataRequest()
         // Request an event when the simulation starts
         hr = SimConnect_SubscribeToSystemEvent(hSimConnect, EVENT_SIM_START, "SimStart");
 
-        printf("\nPlease launch a new flight now.\n");
+        printf("\nYou can now start a new flight. If flight was started before no data can be received.\n");
 
         while (0 == quit)
         {
@@ -515,11 +484,13 @@ bool DisplayIPAdresses()
 int main()
 {
     HANDLE TCPThread=NULL;
+    HANDLE DummySender = NULL;
     printf("Welcome to Fs2020 NMEA Adapter.\n\n");
 
     printf("You can use the following IP Adresses & ports to connect to the Flight Simulator 2020 NMEA stream\n");
     DisplayIPAdresses();
 
+    /*
     Struct1 x;
     x.altitude = 0.0;
     x.heading = 0.0;
@@ -530,6 +501,8 @@ int main()
     returnGPRMCSentence(GPRMC, x);
     returnGPGGASentence(GPGGA, x);
     returnGPGSASentence(GPGSA, x);
+*/
+    DummySender = CreateThread(NULL, 0, SendDummySentence, NULL, 0, NULL);
 
     TCPThread = CreateThread(NULL, 0, DoTCPIPSocket, NULL, 0, NULL);
     if (NULL == TCPThread)
@@ -542,6 +515,8 @@ int main()
      
     //Terminate TCP Thread
     bStopSending = true;
+    bSendDummySentences = false;
+    WaitForSingleObject(DummySender, INFINITE);
     WaitForSingleObject(TCPThread, INFINITE);
     CloseHandle(TCPThread);
     return 0;

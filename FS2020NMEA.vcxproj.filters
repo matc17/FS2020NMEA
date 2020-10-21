@@ -23,4 +23,9 @@
     <None Include="LICENSE.md" />
     <None Include="Readme.md" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="FS2020NMEA.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+  </ItemGroup>
 </Project>
