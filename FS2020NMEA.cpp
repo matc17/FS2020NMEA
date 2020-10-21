@@ -51,12 +51,24 @@ bool getCheckSum(MyString& string)
 double toNMEACoordinate(double number)
 {
     double RetVal = 0.0;
+    if ( 0 < number)
+    {
+        RetVal = floor(number);
+        double remaining = number - RetVal;
+        RetVal *= 100.0;
+        remaining *= 60.0;
+        RetVal += remaining;
+    }
+    else
+    {
+        RetVal = ceil(number);
+        double remaining = RetVal - number;
+        RetVal = fabs(RetVal);
+        RetVal *= 100.0;
+        remaining *= 60.0;
+        RetVal += remaining;
+    }
 
-    RetVal = fabs(floor(number)) ;
-    double remaining = number - RetVal;
-    RetVal *= 100.0;
-    remaining *= 60.0;
-    RetVal += remaining;
 
     return RetVal;
 }
