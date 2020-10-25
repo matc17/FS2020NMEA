@@ -83,7 +83,7 @@ bool returnGPRMCSentence(MyString& string, Struct1& Raw)
 
     string.m_Section.Enter();
     snprintf(string.m_p, string.m_size, "$GPRMC,%02d%02d%02d.00,A,%010.5f,%c,%010.5f,%c,%2.1f,%2.1f,%d%d%d,0.0,E,A*",
-        Time.wHour, Time.wMinute, Time.wSecond, toNMEACoordinate(Raw.latitude), ((Raw.latitude > 0.0) ? 'N' : 'S'), toNMEACoordinate(Raw.longitude), ((Raw.longitude > 0.0) ? 'E' : 'W'), Raw.speed, Raw.heading, Time.wDay, Time.wMonth, Time.wYear);
+        Time.wHour, Time.wMinute, Time.wSecond, toNMEACoordinate(Raw.latitude), ((Raw.latitude > 0.0) ? 'N' : 'S'), toNMEACoordinate(Raw.longitude), ((Raw.longitude > 0.0) ? 'E' : 'W'), Raw.speed, Raw.heading, Time.wDay, Time.wMonth, (Time.wYear)%100);
 
  
 
